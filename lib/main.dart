@@ -57,6 +57,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedTab = 0;
   int _selectedFilter = 0;
 
   static final List<Restroom> _restrooms = [
@@ -124,15 +125,6 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF1565C0),
         toolbarHeight: 64,
         titleSpacing: 8,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white, size: 32),
-              onPressed: () {},
-            ),
-          ),
-        ],
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -149,126 +141,198 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: IndexedStack(
+        index: _selectedTab,
         children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: const TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search restrooms...',
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Icon(Icons.search, color: Colors.blueGrey),
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-          ),
-
-          // Stat cards
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: Row(
-              children: [
-                _StatCard(
-                  icon: Icons.wc,
-                  value: '${_restrooms.length}',
-                  label: 'Nearby',
-                  color: const Color(0xFF1565C0),
-                ),
-                const SizedBox(width: 10),
-                _StatCard(
-                  icon: Icons.access_time,
-                  value: '$openCount',
-                  label: 'Open Now',
-                  color: Colors.green[700]!,
-                ),
-                const SizedBox(width: 10),
-                _StatCard(
-                  icon: Icons.star,
-                  value: avgRating,
-                  label: 'Avg Rating',
-                  color: Colors.amber[700]!,
-                ),
-              ],
-            ),
-          ),
-
-          // Section header + filter chips
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Restrooms Near You',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.grey[850],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChipWidget(
-                        label: 'All',
-                        index: 0,
-                        selected: _selectedFilter,
-                        onTap: (i) => setState(() => _selectedFilter = i),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChipWidget(
-                        label: 'Open Now',
-                        index: 1,
-                        selected: _selectedFilter,
-                        onTap: (i) => setState(() => _selectedFilter = i),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChipWidget(
-                        label: 'Top Rated',
-                        index: 2,
-                        selected: _selectedFilter,
-                        onTap: (i) => setState(() => _selectedFilter = i),
+          // Tab 0: Restroom List
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
+                  child: const TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search restrooms...',
+                      prefixIcon: Padding(
+                        padding: EdgeInsets.only(left: 10),
+                        child: Icon(Icons.search, color: Colors.blueGrey),
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
                 ),
+              ),
+              // Stat cards
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Row(
+                  children: [
+                    _StatCard(
+                      icon: Icons.wc,
+                      value: '${_restrooms.length}',
+                      label: 'Nearby',
+                      color: const Color(0xFF1565C0),
+                    ),
+                    const SizedBox(width: 10),
+                    _StatCard(
+                      icon: Icons.access_time,
+                      value: '$openCount',
+                      label: 'Open Now',
+                      color: Colors.green[700]!,
+                    ),
+                    const SizedBox(width: 10),
+                    _StatCard(
+                      icon: Icons.star,
+                      value: avgRating,
+                      label: 'Avg Rating',
+                      color: Colors.amber[700]!,
+                    ),
+                  ],
+                ),
+              ),
+              // Section header + filter chips
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Restrooms Near You',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey[850],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _FilterChipWidget(
+                            label: 'All',
+                            index: 0,
+                            selected: _selectedFilter,
+                            onTap: (i) => setState(() => _selectedFilter = i),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChipWidget(
+                            label: 'Open Now',
+                            index: 1,
+                            selected: _selectedFilter,
+                            onTap: (i) => setState(() => _selectedFilter = i),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChipWidget(
+                            label: 'Top Rated',
+                            index: 2,
+                            selected: _selectedFilter,
+                            onTap: (i) => setState(() => _selectedFilter = i),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Restroom cards
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) =>
+                      RestroomCard(restroom: filtered[index]),
+                ),
+              ),
+            ],
+          ),
+          // Tab 1: Map
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.map_outlined, size: 64, color: Colors.blueGrey),
+                SizedBox(height: 16),
+                Text(
+                  'Restroom Map',
+                  style: TextStyle(fontSize: 18, color: Colors.blueGrey),
+                ),
+                SizedBox(height: 8),
+                Text('Coming soon', style: TextStyle(color: Colors.grey)),
               ],
             ),
           ),
-
-          // Restroom cards
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) =>
-                  RestroomCard(restroom: filtered[index]),
+          // Tab 2: About
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline, size: 64, color: Colors.blueGrey),
+                SizedBox(height: 16),
+                Text(
+                  'About PottyPal',
+                  style: TextStyle(fontSize: 18, color: Colors.blueGrey),
+                ),
+                SizedBox(height: 8),
+                Text('Coming soon', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+          // Tab 3: Profile
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.person_outline, size: 64, color: Colors.blueGrey),
+                SizedBox(height: 16),
+                Text(
+                  'Profile',
+                  style: TextStyle(fontSize: 18, color: Colors.blueGrey),
+                ),
+                SizedBox(height: 8),
+                Text('Coming soon', style: TextStyle(color: Colors.grey)),
+              ],
             ),
           ),
         ],
       ),
-
-      floatingActionButton: FloatingActionButton.extended(
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedTab,
+        onTap: (i) => setState(() => _selectedTab = i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFF1565C0),
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Restrooms',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map_outlined), label: 'Map'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.info_outline),
+            label: 'About',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -278,11 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
         backgroundColor: const Color(0xFF1565C0),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Add Restroom',
-          style: TextStyle(color: Colors.white),
-        ),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
