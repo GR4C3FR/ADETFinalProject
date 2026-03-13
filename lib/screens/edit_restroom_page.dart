@@ -555,92 +555,83 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
             const SizedBox(height: 20),
             const _SectionLabel(text: 'Amenities'),
             const SizedBox(height: 12),
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final itemWidth = constraints.maxWidth < 330
-                        ? 52.0
-                        : constraints.maxWidth < 420
-                        ? 60.0
-                        : 64.0;
-                    final circleSize = constraints.maxWidth < 330 ? 44.0 : 52.0;
-                    final iconSize = constraints.maxWidth < 330 ? 18.0 : 22.0;
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth < 330
+                    ? 52.0
+                    : constraints.maxWidth < 420
+                    ? 60.0
+                    : 64.0;
+                final circleSize = constraints.maxWidth < 330 ? 44.0 : 52.0;
+                final iconSize = constraints.maxWidth < 330 ? 18.0 : 20.0;
 
-                    return Wrap(
-                      alignment: WrapAlignment.start,
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: _amenityOptions.map((amenity) {
-                        final isSelected = _selectedAmenities.contains(amenity);
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedAmenities.remove(amenity);
-                              } else {
-                                _selectedAmenities.add(amenity);
-                              }
-                            });
-                          },
-                          child: SizedBox(
-                            width: itemWidth,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: circleSize,
-                                  height: circleSize,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? const Color(0xFF1565C0)
-                                          : Colors.grey.shade300,
-                                      width: 2,
-                                    ),
-                                    color: isSelected
-                                        ? const Color(0xFF1565C0)
-                                        : Colors.white,
-                                  ),
-                                  child: Icon(
-                                    _amenityIcons[amenity] ??
-                                        Icons.check_circle_outline,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.grey.shade400,
-                                    size: iconSize,
-                                  ),
+                return Wrap(
+                  alignment: WrapAlignment.start,
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _amenityOptions.map((amenity) {
+                    final isSelected = _selectedAmenities.contains(amenity);
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedAmenities.remove(amenity);
+                          } else {
+                            _selectedAmenities.add(amenity);
+                          }
+                        });
+                      },
+                      child: SizedBox(
+                        width: itemWidth,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: circleSize,
+                              height: circleSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF1565C0)
+                                      : Colors.grey.shade300,
+                                  width: 2,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  amenity,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.black87
-                                        : Colors.grey.shade400,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                color: isSelected
+                                    ? const Color(0xFF1565C0)
+                                    : Colors.transparent,
+                              ),
+                              child: Icon(
+                                _amenityIcons[amenity] ??
+                                    Icons.check_circle_outline,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.grey.shade400,
+                                size: iconSize,
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                            const SizedBox(height: 6),
+                            Text(
+                              amenity,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                    ? Colors.black87
+                                    : Colors.grey.shade400,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
                     );
-                  },
-                ),
-              ),
+                  }).toList(),
+                );
+              },
             ),
 
             const SizedBox(height: 32),

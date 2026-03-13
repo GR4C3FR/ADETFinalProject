@@ -149,100 +149,90 @@ class RestroomDetailPage extends StatelessWidget {
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final itemWidth = constraints.maxWidth < 330
-                              ? 52.0
-                              : constraints.maxWidth < 420
-                              ? 60.0
-                              : 64.0;
-                          final circleSize = constraints.maxWidth < 330
-                              ? 44.0
-                              : 52.0;
-                          final iconSize = constraints.maxWidth < 330
-                              ? 18.0
-                              : 20.0;
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final itemWidth = constraints.maxWidth < 330
+                          ? 52.0
+                          : constraints.maxWidth < 420
+                          ? 60.0
+                          : 64.0;
+                      final circleSize = constraints.maxWidth < 330
+                          ? 44.0
+                          : 52.0;
+                      final iconSize = constraints.maxWidth < 330 ? 18.0 : 20.0;
 
-                          return Wrap(
-                            alignment: WrapAlignment.start,
-                            spacing: 12,
-                            runSpacing: 12,
-                            children:
-                                [
-                                  'Soap',
-                                  'Tissue',
-                                  'Spacious',
-                                  'PWD',
-                                  'Bidet',
-                                  'Clean',
-                                  'Lock',
-                                  'Accessible',
-                                  'No Fee',
-                                ].map((amenity) {
-                                  final isAvailable = restroom.amenities.any(
-                                    (a) =>
-                                        a.toLowerCase() ==
-                                        amenity.toLowerCase(),
-                                  );
-                                  return SizedBox(
-                                    width: itemWidth,
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: circleSize,
-                                          height: circleSize,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: isAvailable
-                                                  ? const Color(0xFF1565C0)
-                                                  : Colors.grey.shade300,
-                                              width: 2,
-                                            ),
-                                            color: isAvailable
-                                                ? const Color(0xFF1565C0)
-                                                : Colors.transparent,
-                                          ),
-                                          child: Icon(
-                                            _amenityIcons[amenity] ??
-                                                Icons.check_circle_outline,
-                                            color: isAvailable
-                                                ? Colors.white
-                                                : Colors.grey.shade400,
-                                            size: iconSize,
-                                          ),
+                      return Wrap(
+                        alignment: WrapAlignment.start,
+                        spacing: 12,
+                        runSpacing: 12,
+                        children:
+                            [
+                              'Soap',
+                              'Tissue',
+                              'Spacious',
+                              'PWD',
+                              'Bidet',
+                              'Clean',
+                              'Lock',
+                              'Accessible',
+                              'No Fee',
+                            ].map((amenity) {
+                              final isAvailable = restroom.amenities.any(
+                                (a) => a.toLowerCase() == amenity.toLowerCase(),
+                              );
+                              return SizedBox(
+                                width: itemWidth,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 180,
+                                      ),
+                                      width: circleSize,
+                                      height: circleSize,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isAvailable
+                                              ? const Color(0xFF1565C0)
+                                              : Colors.grey.shade300,
+                                          width: 2,
                                         ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          amenity,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500,
-                                            color: isAvailable
-                                                ? Colors.black87
-                                                : Colors.grey.shade400,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                                        color: isAvailable
+                                            ? const Color(0xFF1565C0)
+                                            : Colors.transparent,
+                                      ),
+                                      child: Icon(
+                                        _amenityIcons[amenity] ??
+                                            Icons.check_circle_outline,
+                                        color: isAvailable
+                                            ? Colors.white
+                                            : Colors.grey.shade400,
+                                        size: iconSize,
+                                      ),
                                     ),
-                                  );
-                                }).toList(),
-                          );
-                        },
-                      ),
-                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      amenity,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: isAvailable
+                                            ? Colors.black87
+                                            : Colors.grey.shade400,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                      );
+                    },
                   ),
                   const SizedBox(height: 28),
                   const Text(
