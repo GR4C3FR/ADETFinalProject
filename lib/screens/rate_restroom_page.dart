@@ -27,7 +27,7 @@ class RateRestroomPage extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image(
-                  image: restroom.imageProvider, // ADDED: local asset image
+                  image: restroom.imageProvider,
                   fit: BoxFit.cover,
                   alignment: restroom.imageAlignment,
                 ),
@@ -59,9 +59,42 @@ class RateRestroomPage extends StatelessWidget {
                 ),
               ],
             ),
-          )
-        ]
-      )
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              minLines: 4,
+              maxLines: 6,
+              decoration: InputDecoration(
+                hintText: 'Share your review (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1565C0),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Submit Review'),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

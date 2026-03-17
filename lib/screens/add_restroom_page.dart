@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../models/restroom.dart';
@@ -14,7 +13,14 @@ class _SelectedImage {
 }
 
 class AddRestroomPage extends StatefulWidget {
-  const AddRestroomPage({super.key});
+  final double? initialLatitude;
+  final double? initialLongitude;
+
+  const AddRestroomPage({
+    super.key,
+    this.initialLatitude,
+    this.initialLongitude,
+  });
 
   @override
   State<AddRestroomPage> createState() => _AddRestroomPageState();
@@ -25,6 +31,9 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
   final _addressController = TextEditingController();
   final Set<String> _selectedAmenities = {};
   final List<_SelectedImage> _selectedImages = [];
+  TimeOfDay _openingTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _closingTime = const TimeOfDay(hour: 17, minute: 0);
+  bool _open24Hours = false;
   String? _nameError;
   String? _addressError;
   String? _imagesError;
@@ -213,6 +222,32 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
     });
   }
 
+  Future<void> _pickOpeningTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _openingTime,
+      helpText: 'Select opening time',
+    );
+    if (picked != null) {
+      setState(() {
+        _openingTime = picked;
+      });
+    }
+  }
+
+  Future<void> _pickClosingTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _closingTime,
+      helpText: 'Select closing time',
+    );
+    if (picked != null) {
+      setState(() {
+        _closingTime = picked;
+      });
+    }
+  }
+
   void _validateAndSubmit() {
     setState(() {
       _nameError = _nameController.text.isEmpty
@@ -225,6 +260,13 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
     });
 
     if (_nameError == null && _addressError == null && _imagesError == null) {
+      final openingTime = _open24Hours
+          ? const TimeOfDay(hour: 0, minute: 0)
+          : _openingTime;
+      final closingTime = _open24Hours
+          ? const TimeOfDay(hour: 0, minute: 0)
+          : _closingTime;
+
       final newRestroom = Restroom(
         imageColor: const Color(0xFF1976D2),
         imagePath: _selectedImages.first.path,
@@ -233,12 +275,16 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
         photoBytesList: _selectedImages.map((img) => img.bytes).toList(),
         name: _nameController.text,
         address: _addressController.text,
+        latitude: widget.initialLatitude,
+        longitude: widget.initialLongitude,
         distance: '0 m away',
         rating: 0.0,
         reviewCount: 0,
         amenities: _selectedAmenities.toList(),
         cardColor: const Color(0xFFE3F2FD),
         isOpen: true,
+        openingTime: openingTime,
+        closingTime: closingTime,
         isUserAdded: true,
       );
 
@@ -463,6 +509,74 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
                   filled: true,
                   fillColor: Colors.white,
                   contentPadding: const EdgeInsets.all(14),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF1565C0), width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Operating Hours (Philippines Time)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _open24Hours,
+                      onChanged: (value) {
+                        setState(() {
+                          _open24Hours = value;
+                        });
+                      },
+                      title: const Text(
+                        'Open 24 Hours',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (!_open24Hours)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickOpeningTime,
+                              icon: const Icon(Icons.schedule),
+                              label: Text(
+                                'Open: ${_openingTime.format(context)}',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickClosingTime,
+                              icon: const Icon(Icons.schedule_outlined),
+                              label: Text(
+                                'Close: ${_closingTime.format(context)}',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (_open24Hours)
+                      const Text(
+                        'Open and close times will both be set to 12:00 AM.',
+                        style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 28),

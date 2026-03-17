@@ -1,40 +1,54 @@
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  final int addedCount;
+  final int reviewsCount;
+  final int savedCount;
+  final int flagCount;
+
+  const ProfilePage({
+    super.key,
+    this.addedCount = 0,
+    this.reviewsCount = 0,
+    this.savedCount = 0,
+    this.flagCount = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
+    const appBlue = Color(0xFF1565C0);
+
     return SingleChildScrollView(
       child: Column(
         children: [
-          // ADDED: profile header with local asset avatar image
+          // ADDED: profile header with themed avatar icon
           Container(
             width: double.infinity,
-            color: const Color(0xFF1565C0),
+            color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 32),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // ADDED: local asset image as avatar
+                // ADDED: solid blue avatar with white person icon
                 Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 3),
-                    color: Colors.white,
+                    color: appBlue,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.asset(
-                    'assets/images/default-avatar.png', // ADDED: local asset image
-                    fit: BoxFit.cover,
+                  child: const Icon(
+                    Icons.person,
+                    size: 52,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
                   'Guest User',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Colors.black87,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -42,10 +56,7 @@ class ProfilePage extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   'PottyPal Member',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.blueGrey, fontSize: 13),
                 ),
               ],
             ),
@@ -58,23 +69,30 @@ class ProfilePage extends StatelessWidget {
               children: [
                 _StatTile(
                   icon: Icons.wc,
-                  value: '0',
+                  value: '$addedCount',
                   label: 'Added',
-                  color: const Color(0xFF1565C0),
+                  color: Colors.green,
                 ),
                 const SizedBox(width: 10),
                 _StatTile(
                   icon: Icons.star,
-                  value: '0',
+                  value: '$reviewsCount',
                   label: 'Reviews',
                   color: Colors.amber[700]!,
                 ),
                 const SizedBox(width: 10),
                 _StatTile(
-                  icon: Icons.favorite,
-                  value: '0',
+                  icon: Icons.bookmark,
+                  value: '$savedCount',
                   label: 'Saved',
-                  color: Colors.red[400]!,
+                  color: const Color(0xFF1565C0),
+                ),
+                const SizedBox(width: 10),
+                _StatTile(
+                  icon: Icons.flag_rounded,
+                  value: '$flagCount',
+                  label: 'Flags',
+                  color: Colors.deepOrange,
                 ),
               ],
             ),

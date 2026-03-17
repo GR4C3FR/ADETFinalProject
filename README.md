@@ -1,16 +1,26 @@
-# wander_list
+# PottyPal
 
-A new Flutter project.
+PottyPal is a user-powered public restroom finder built with Flutter.
 
-## Getting Started
+## Milestone 3: API Integration
 
-This project is a starting point for a Flutter application.
+### Short Introduction to RESTful APIs
 
-A few resources to get you started if this is your first Flutter project:
+A RESTful API is a web service that exposes resources through standard HTTP methods such as `GET`, `POST`, `PUT`, and `DELETE`.
+In this milestone, PottyPal uses a `GET` request to retrieve live restroom-related place data from an external endpoint and display it in the app.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Implemented Requirements
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Added the `http` package in `pubspec.yaml`.
+- Connected to one real API endpoint:
+  - `https://nominatim.openstreetmap.org/search?q=public+toilet+Manila+Philippines&format=json&limit=5`
+- Parsed JSON data using `jsonDecode`.
+- Created a model class with `fromJson()`:
+  - `ApiRestroomPlace` in `lib/models/api_restroom_place.dart`
+- Implemented API fetch and mapped response data to model objects.
+- Added loading state UI using `CircularProgressIndicator`.
+- Added basic error handling using `try/catch` and an on-screen error message with a retry button.
+
+### Notes
+
+- The app still keeps local restroom entries, and now also shows a new `Live API Suggestions` section powered by the API response.

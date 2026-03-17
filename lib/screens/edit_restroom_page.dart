@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/restroom.dart';
@@ -27,7 +26,9 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
   late final TextEditingController _addressController;
   late final Set<String> _selectedAmenities;
   late final List<_EditablePhoto> _editablePhotos;
-  late bool _isOpen;
+  late TimeOfDay _openingTime;
+  late TimeOfDay _closingTime;
+  late bool _open24Hours;
   final ImagePicker _imagePicker = ImagePicker();
 
   String? _nameError;
@@ -74,7 +75,17 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
           : (index == 0 ? widget.restroom.imageBytes : null);
       return _EditablePhoto(path: initialPaths[index], bytes: bytes);
     });
-    _isOpen = widget.restroom.isOpen;
+    _openingTime =
+        widget.restroom.openingTime ?? const TimeOfDay(hour: 9, minute: 0);
+    _closingTime =
+        widget.restroom.closingTime ?? const TimeOfDay(hour: 17, minute: 0);
+    _open24Hours =
+        widget.restroom.openingTime != null &&
+        widget.restroom.closingTime != null &&
+        widget.restroom.openingTime!.hour ==
+            widget.restroom.closingTime!.hour &&
+        widget.restroom.openingTime!.minute ==
+            widget.restroom.closingTime!.minute;
   }
 
   @override
@@ -248,6 +259,32 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
     });
   }
 
+  Future<void> _pickOpeningTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _openingTime,
+      helpText: 'Select opening time',
+    );
+    if (picked != null) {
+      setState(() {
+        _openingTime = picked;
+      });
+    }
+  }
+
+  Future<void> _pickClosingTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _closingTime,
+      helpText: 'Select closing time',
+    );
+    if (picked != null) {
+      setState(() {
+        _closingTime = picked;
+      });
+    }
+  }
+
   void _validateAndSave() {
     setState(() {
       _nameError = _nameController.text.trim().isEmpty
@@ -264,6 +301,12 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
     }
 
     final firstPhoto = _editablePhotos.first;
+    final openingTime = _open24Hours
+        ? const TimeOfDay(hour: 0, minute: 0)
+        : _openingTime;
+    final closingTime = _open24Hours
+        ? const TimeOfDay(hour: 0, minute: 0)
+        : _closingTime;
 
     final updated = Restroom(
       imageColor: widget.restroom.imageColor,
@@ -277,12 +320,16 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
       imageAlignment: widget.restroom.imageAlignment,
       name: _nameController.text.trim(),
       address: _addressController.text.trim(),
+      latitude: widget.restroom.latitude,
+      longitude: widget.restroom.longitude,
       distance: widget.restroom.distance,
       rating: widget.restroom.rating,
       reviewCount: widget.restroom.reviewCount,
       amenities: _selectedAmenities.toList(),
       cardColor: widget.restroom.cardColor,
-      isOpen: _isOpen,
+      isOpen: true,
+      openingTime: openingTime,
+      closingTime: closingTime,
       isUserAdded: widget.restroom.isUserAdded,
     );
 
@@ -338,10 +385,13 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            onPressed: _confirmDelete,
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
-            tooltip: 'Delete Restroom',
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: _confirmDelete,
+              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              tooltip: 'Delete Restroom',
+            ),
           ),
         ],
       ),
@@ -523,32 +573,71 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
               ),
 
             const SizedBox(height: 20),
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1565C0), width: 1),
               ),
-              child: SwitchListTile(
-                value: _isOpen,
-                onChanged: (v) => setState(() => _isOpen = v),
-                activeThumbColor: const Color(0xFF1565C0),
-                title: const Text(
-                  'Currently Open',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-                subtitle: Text(
-                  _isOpen
-                      ? 'Restroom is open to the public'
-                      : 'Restroom is currently closed',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isOpen ? Colors.green[700] : Colors.red[400],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Operating Hours (Philippines Time)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                secondary: Icon(
-                  _isOpen ? Icons.lock_open : Icons.lock,
-                  color: _isOpen ? Colors.green[700] : Colors.red[400],
-                ),
+                  const SizedBox(height: 10),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: _open24Hours,
+                    onChanged: (value) {
+                      setState(() {
+                        _open24Hours = value;
+                      });
+                    },
+                    title: const Text(
+                      'Open 24 Hours',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (!_open24Hours)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickOpeningTime,
+                            icon: const Icon(Icons.schedule),
+                            label: Text(
+                              'Open: ${_openingTime.format(context)}',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickClosingTime,
+                            icon: const Icon(Icons.schedule_outlined),
+                            label: Text(
+                              'Close: ${_closingTime.format(context)}',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (_open24Hours)
+                    const Text(
+                      'Open and close times will both be set to 12:00 AM.',
+                      style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                    ),
+                ],
               ),
             ),
 
