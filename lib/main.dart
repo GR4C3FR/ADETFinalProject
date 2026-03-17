@@ -70,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _statusRefreshTimer;
   Timer? _internetProbeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<Position>? _positionSubscription;
   bool? _isOffline;
   LatLng? _userLocation;
   Restroom? _mapDirectionsTarget;
@@ -271,6 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _loadCurrentLocation();
+    _startLocationTracking();
     _startConnectivityMonitoring();
     _searchController.addListener(() => setState(() {}));
   }
@@ -278,11 +280,51 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _positionSubscription?.cancel();
     _internetProbeTimer?.cancel();
     _statusRefreshTimer?.cancel();
     _pageController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _hasLocationPermission() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      return permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _startLocationTracking() async {
+    final hasPermission = await _hasLocationPermission();
+    if (!hasPermission) {
+      return;
+    }
+
+    try {
+      _positionSubscription =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 3,
+            ),
+          ).listen((position) {
+            if (!mounted) return;
+
+            setState(() {
+              _userLocation = LatLng(position.latitude, position.longitude);
+            });
+          });
+    } catch (_) {
+      // Keep app usable if live tracking fails.
+    }
   }
 
   bool _isDisconnected(List<ConnectivityResult> results) {
@@ -370,14 +412,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadCurrentLocation() async {
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _userLocation = _hauDemoCenter);
-        return;
+      if (!kIsWeb) {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          setState(() => _userLocation = _hauDemoCenter);
+          return;
+        }
       }
 
       var permission = await Geolocator.checkPermission();
-      if (!kIsWeb && permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 

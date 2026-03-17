@@ -251,7 +251,7 @@ class _MapPageState extends State<MapPage>
   Future<bool> _hasLocationPermission() async {
     try {
       var permission = await Geolocator.checkPermission();
-      if (!kIsWeb && permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 
@@ -344,7 +344,7 @@ class _MapPageState extends State<MapPage>
     }
 
     var permission = await Geolocator.checkPermission();
-    if (!kIsWeb && permission == LocationPermission.denied) {
+    if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
 
