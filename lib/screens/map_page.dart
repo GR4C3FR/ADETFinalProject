@@ -204,6 +204,11 @@ class _MapPageState extends State<MapPage>
   }
 
   Future<void> _startLocationTracking() async {
+    final hasPermission = await _hasLocationPermission();
+    if (!hasPermission) {
+      return;
+    }
+
     try {
       final stream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -212,26 +217,48 @@ class _MapPageState extends State<MapPage>
         ),
       );
 
-      _positionSubscription = stream.listen((position) {
-        if (!mounted) return;
+      _positionSubscription = stream.listen(
+        (position) {
+          if (!mounted) return;
 
-        final next = LatLng(position.latitude, position.longitude);
-        final previous = _userLocation;
-        final movedMeters = previous == null
-            ? 0.0
-            : _distance.as(LengthUnit.Meter, previous, next);
-        final moving =
-            (position.speed > 0.8) || (movedMeters >= _movementThresholdMeters);
+          final next = LatLng(position.latitude, position.longitude);
+          final previous = _userLocation;
+          final movedMeters = previous == null
+              ? 0.0
+              : _distance.as(LengthUnit.Meter, previous, next);
+          final moving =
+              (position.speed > 0.8) ||
+              (movedMeters >= _movementThresholdMeters);
 
-        if (previous == null || movedMeters >= 1.5 || moving != _isUserMoving) {
-          setState(() {
-            _userLocation = next;
-            _isUserMoving = moving;
-          });
-        }
-      });
+          if (previous == null ||
+              movedMeters >= 1.5 ||
+              moving != _isUserMoving) {
+            setState(() {
+              _userLocation = next;
+              _isUserMoving = moving;
+            });
+          }
+        },
+        onError: (_) {
+          // Ignore location stream errors (e.g., permission denied) and keep map usable.
+        },
+      );
     } catch (_) {
       // Keep existing behavior if live stream cannot start.
+    }
+  }
+
+  Future<bool> _hasLocationPermission() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (!kIsWeb && permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      return permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -317,7 +344,7 @@ class _MapPageState extends State<MapPage>
     }
 
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
+    if (!kIsWeb && permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
 

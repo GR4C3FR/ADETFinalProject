@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -376,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (!kIsWeb && permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 
