@@ -933,6 +933,65 @@ class _HomeScreenState extends State<HomeScreen> {
             reviewsCount: _userReviewCount,
             savedCount: _savedRestroomKeys.length,
             flagCount: _totalFlagCount,
+            addedRestrooms: _restrooms
+                .where((r) => r.isUserAdded)
+                .toList(),
+            reviewedRestrooms: _restrooms
+                .where((r) => _reviewsByRestroomKey
+                    .containsKey(_restroomKey(r)))
+                .toList(),
+            savedRestrooms: _restrooms
+                .where((r) => _isSaved(r))
+                .toList(),
+            flaggedRestrooms: _restrooms
+                .where((r) =>
+                    _flagReasonsByRestroomKey
+                        .containsKey(_restroomKey(r)))
+                .toList(),
+            onRestroomTap: (restroom) async {
+              final result = await Navigator.push<Object?>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RestroomDetailPage(
+                    restroom: restroom,
+                    isSaved: _isSaved(restroom),
+                    onToggleSaved: () => _toggleSaved(restroom),
+                    flagCount: _flagCountFor(restroom),
+                    onSubmitFlag: (reason) =>
+                        _submitFlag(restroom, reason),
+                    initialReviews: _reviewsFor(restroom),
+                    onSubmitReview: (rating, comment) =>
+                        _submitUserReview(restroom, rating, comment),
+                    onRestroomChanged: (updatedRestroom) {
+                      _migrateReviewKey(restroom, updatedRestroom);
+                      _migrateSavedKey(restroom, updatedRestroom);
+                      _migrateFlagKey(restroom, updatedRestroom);
+
+                      final index = _restrooms.indexOf(restroom);
+                      if (index >= 0) {
+                        setState(() {
+                          _restrooms[index] = updatedRestroom;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              );
+
+              if (!mounted) return;
+              if (result == 'deleted') {
+                setState(() {
+                  _restrooms.removeWhere((r) => r == restroom);
+                });
+              } else if (result is Restroom) {
+                final index = _restrooms.indexOf(restroom);
+                if (index >= 0) {
+                  setState(() {
+                    _restrooms[index] = result;
+                  });
+                }
+              }
+            },
           ),
           const AboutPage(),
         ],
