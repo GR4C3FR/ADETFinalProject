@@ -68,6 +68,11 @@ flutter:
     - assets/images/sm-city-clark.webp
     - assets/images/pottypal-logo.webp
     - assets/images/default-avatar.png
+    - assets/images/marquee-mall.webp
+    - assets/images/robinson-angeles.webp
+    - assets/images/fontana-leisure.webp
+    - assets/images/clark-museum.webp
+    - assets/images/nepo-mall.webp
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
