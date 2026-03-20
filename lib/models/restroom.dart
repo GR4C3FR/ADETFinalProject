@@ -29,7 +29,7 @@ class Restroom {
   final String imagePath;
   final Uint8List? imageBytes;
   final List<String> photoPaths;
-  final List<Uint8List> photoBytesList;
+  final List<Uint8List?> photoBytesList;
   final Alignment imageAlignment;
   final String name;
   final String address;
@@ -44,6 +44,8 @@ class Restroom {
   final TimeOfDay? openingTime;
   final TimeOfDay? closingTime;
   final bool isUserAdded;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
 
   ImageProvider _providerFor(String path, Uint8List? bytes) {
     if (path.startsWith('assets/')) {
@@ -127,7 +129,7 @@ class Restroom {
     required this.imagePath,
     this.imageBytes,
     List<String>? photoPaths,
-    List<Uint8List>? photoBytesList,
+    List<Uint8List?>? photoBytesList,
     this.imageAlignment = Alignment.center,
     required this.name,
     required this.address,
@@ -142,11 +144,14 @@ class Restroom {
     this.openingTime,
     this.closingTime,
     this.isUserAdded = false,
+    DateTime? createdAt,
+    this.updatedAt,
   }) : _isOpenFlag = isOpen,
+       createdAt = createdAt ?? DateTime.now(),
        photoPaths = List.unmodifiable(photoPaths ?? [imagePath]),
-       photoBytesList = List.unmodifiable(
-         photoBytesList ?? (imageBytes != null ? [imageBytes] : const []),
-       );
+       photoBytesList = List.unmodifiable(photoBytesList ?? [imageBytes]);
+
+  DateTime get latestChangeAt => updatedAt ?? createdAt;
 
   factory Restroom.fromJson(Map<String, dynamic> json) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
@@ -325,10 +330,28 @@ class RestroomReview {
   final double rating;
   final String comment;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   const RestroomReview({
     required this.rating,
     required this.comment,
     required this.createdAt,
+    this.updatedAt,
   });
+
+  DateTime get latestChangeAt => updatedAt ?? createdAt;
+}
+
+class RestroomFlag {
+  final String reason;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+
+  const RestroomFlag({
+    required this.reason,
+    required this.createdAt,
+    this.updatedAt,
+  });
+
+  DateTime get latestChangeAt => updatedAt ?? createdAt;
 }

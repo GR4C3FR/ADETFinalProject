@@ -21,9 +21,12 @@ class RestroomDetailPage extends StatefulWidget {
   final int flagCount;
   final void Function(String reason)? onSubmitFlag;
   final List<RestroomReview> initialReviews;
-  final void Function(double rating, String comment)? onSubmitReview;
+  final List<RestroomFlag> initialFlags;
+  final void Function(List<RestroomReview> reviews)? onReviewsChanged;
+  final void Function(List<RestroomFlag> flags)? onFlagsChanged;
   final void Function(Restroom updatedRestroom)? onRestroomChanged;
   final VoidCallback? onGetDirections;
+  final String restroomActivityLabel;
 
   const RestroomDetailPage({
     super.key,
@@ -33,9 +36,12 @@ class RestroomDetailPage extends StatefulWidget {
     this.flagCount = 0,
     this.onSubmitFlag,
     this.initialReviews = const [],
-    this.onSubmitReview,
+    this.initialFlags = const [],
+    this.onReviewsChanged,
+    this.onFlagsChanged,
     this.onRestroomChanged,
     this.onGetDirections,
+    required this.restroomActivityLabel,
   });
 
   @override
@@ -62,25 +68,27 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
   final ImagePicker _imagePicker = ImagePicker();
 
   late bool _isSaved;
-  late int _flagCount;
   late List<RestroomReview> _reviews;
+  late List<RestroomFlag> _flags;
   late Restroom _restroom;
   late List<_DetailPhoto> _photos;
   double _selectedRating = 0;
   bool _canScrollPhotosPrev = false;
   bool _canScrollPhotosNext = false;
+  late String _restroomActivityLabel;
 
   @override
   void initState() {
     super.initState();
     _isSaved = widget.isSaved;
-    _flagCount = widget.flagCount;
     _reviews = List<RestroomReview>.from(widget.initialReviews);
+    _flags = List<RestroomFlag>.from(widget.initialFlags);
     if (_reviews.isNotEmpty) {
       _selectedRating = _reviews.first.rating;
       _reviewController.text = _reviews.first.comment;
     }
     _restroom = widget.restroom;
+    _restroomActivityLabel = widget.restroomActivityLabel;
     _photos = List.generate(_restroom.photoPaths.length, (index) {
       final bytes = index < _restroom.photoBytesList.length
           ? _restroom.photoBytesList[index]
@@ -104,10 +112,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
       imagePath: first.path,
       imageBytes: first.bytes,
       photoPaths: _photos.map((p) => p.path).toList(),
-      photoBytesList: _photos
-          .map((p) => p.bytes)
-          .whereType<Uint8List>()
-          .toList(),
+      photoBytesList: _photos.map((p) => p.bytes).toList(),
       imageAlignment: _restroom.imageAlignment,
       name: _restroom.name,
       address: _restroom.address,
@@ -122,10 +127,13 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
       openingTime: _restroom.openingTime,
       closingTime: _restroom.closingTime,
       isUserAdded: _restroom.isUserAdded,
+      createdAt: _restroom.createdAt,
+      updatedAt: DateTime.now(),
     );
 
     setState(() {
       _restroom = updated;
+      _restroomActivityLabel = _buildActivityLabel(updated.createdAt);
     });
     widget.onRestroomChanged?.call(updated);
 
@@ -310,13 +318,14 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
       return;
     }
 
+    final isEditingExisting = _reviews.isNotEmpty;
+    final previous = isEditingExisting ? _reviews.first : null;
     final review = RestroomReview(
       rating: _selectedRating,
       comment: comment,
-      createdAt: DateTime.now(),
+      createdAt: previous?.createdAt ?? DateTime.now(),
+      updatedAt: previous == null ? null : DateTime.now(),
     );
-
-    final isEditingExisting = _reviews.isNotEmpty;
 
     setState(() {
       if (isEditingExisting) {
@@ -326,7 +335,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
       }
     });
 
-    widget.onSubmitReview?.call(review.rating, review.comment);
+    widget.onReviewsChanged?.call(List<RestroomReview>.from(_reviews));
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -335,6 +344,139 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
         ),
       ),
     );
+  }
+
+  String _timeAgo(DateTime value) {
+    final diff = DateTime.now().difference(value);
+    if (diff.inDays >= 30) {
+      return _formatDate(value);
+    }
+    if (diff.inSeconds < 60) {
+      return '${diff.inSeconds <= 1 ? 1 : diff.inSeconds} sec ago';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} min ago';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours} hr ago';
+    }
+    if (diff.inDays < 7) {
+      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    }
+    if (diff.inDays < 30) {
+      final weeks = (diff.inDays / 7).floor();
+      return '$weeks week${weeks == 1 ? '' : 's'} ago';
+    }
+    final months = (diff.inDays / 30).floor();
+    return '$months mo${months == 1 ? '' : 's'} ago';
+  }
+
+  String _formatDate(DateTime value) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final month = months[value.month - 1];
+    final day = value.day.toString().padLeft(2, '0');
+    return '$month $day, ${value.year}';
+  }
+
+  String _buildActivityLabel(DateTime value) {
+    return _timeAgo(value);
+  }
+
+  String get _latestReviewLabel {
+    if (_reviews.isEmpty) {
+      return _buildActivityLabel(_restroom.createdAt);
+    }
+    DateTime latest = _reviews.first.latestChangeAt;
+    for (final review in _reviews.skip(1)) {
+      if (review.latestChangeAt.isAfter(latest)) {
+        latest = review.latestChangeAt;
+      }
+    }
+    return _buildActivityLabel(latest);
+  }
+
+  String get _latestFlagLabel {
+    if (_flags.isEmpty) {
+      return _buildActivityLabel(_restroom.createdAt);
+    }
+    DateTime latest = _flags.first.latestChangeAt;
+    for (final flag in _flags.skip(1)) {
+      if (flag.latestChangeAt.isAfter(latest)) {
+        latest = flag.latestChangeAt;
+      }
+    }
+    return _buildActivityLabel(latest);
+  }
+
+  int get _displayReviewCount => _restroom.reviewCount + _reviews.length;
+
+  double get _displayRating {
+    final baseTotal = _restroom.rating * _restroom.reviewCount;
+    final userTotal = _reviews.fold<double>(
+      0,
+      (sum, review) => sum + review.rating,
+    );
+    final totalCount = _displayReviewCount;
+    if (totalCount <= 0) return 0;
+    return double.parse(
+      ((baseTotal + userTotal) / totalCount).toStringAsFixed(1),
+    );
+  }
+
+  void _deleteReview(int index) {
+    if (index < 0 || index >= _reviews.length) return;
+
+    setState(() {
+      _reviews.removeAt(index);
+      if (_reviews.isEmpty) {
+        _selectedRating = 0;
+        _reviewController.clear();
+      } else {
+        final newest = _reviews.first;
+        _selectedRating = newest.rating;
+        _reviewController.text = newest.comment;
+      }
+    });
+
+    widget.onReviewsChanged?.call(List<RestroomReview>.from(_reviews));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Review deleted.')));
+  }
+
+  void _addFlag(String reason) {
+    setState(() {
+      _flags = [
+        ..._flags,
+        RestroomFlag(reason: reason, createdAt: DateTime.now()),
+      ];
+    });
+
+    widget.onFlagsChanged?.call(List<RestroomFlag>.from(_flags));
+  }
+
+  void _deleteFlag(int index) {
+    if (index < 0 || index >= _flags.length) return;
+    setState(() {
+      _flags.removeAt(index);
+    });
+    widget.onFlagsChanged?.call(List<RestroomFlag>.from(_flags));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Flag removed.')));
   }
 
   @override
@@ -423,6 +565,15 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                       color: Colors.black87,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _restroomActivityLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.blueGrey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -430,7 +581,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                         5,
                         (index) => Icon(
                           Icons.star,
-                          color: index < restroom.rating.toInt()
+                          color: index < _displayRating.toInt()
                               ? Colors.amber
                               : Colors.grey.shade300,
                           size: 18,
@@ -438,7 +589,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${restroom.rating}  (${restroom.reviewCount})',
+                        '${_displayRating.toStringAsFixed(1)}  ($_displayReviewCount)',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.grey,
@@ -454,29 +605,54 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Row(
+                      child: Column(
                         children: [
-                          const Icon(
-                            Icons.location_on,
-                            color: Color(0xFF1565C0),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              restroom.address,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                color: Color(0xFF1565C0),
+                                size: 20,
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  restroom.address,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule,
+                                color: Color(0xFF1565C0),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Hours: ${restroom.operatingHoursLabel} (PHT)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blueGrey,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  if (_flagCount > 0)
+                  if (_flags.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
@@ -488,7 +664,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '$_flagCount flag${_flagCount == 1 ? '' : 's'} reported',
+                            '${_flags.length} flag${_flags.length == 1 ? '' : 's'} reported',
                             style: const TextStyle(
                               color: Colors.deepOrange,
                               fontWeight: FontWeight.w600,
@@ -506,9 +682,7 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                         if (reason == null || reason.isEmpty) return;
 
                         widget.onSubmitFlag?.call(reason);
-                        setState(() {
-                          _flagCount += 1;
-                        });
+                        _addFlag(reason);
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -811,7 +985,9 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                     )
                   else
                     Column(
-                      children: _reviews.map((review) {
+                      children: _reviews.asMap().entries.map((entry) {
+                        final reviewIndex = entry.key;
+                        final review = entry.value;
                         return Container(
                           width: double.infinity,
                           margin: const EdgeInsets.only(bottom: 10),
@@ -843,6 +1019,29 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _latestReviewLabel,
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.blueGrey,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete review',
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                    ),
+                                    color: Colors.red[400],
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => _deleteReview(reviewIndex),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 6),
@@ -855,6 +1054,72 @@ class _RestroomDetailPageState extends State<RestroomDetailPage> {
                           ),
                         );
                       }).toList(),
+                    ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Flags',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_flags.isEmpty)
+                    const Text(
+                      'No flags submitted for this restroom.',
+                      style: TextStyle(color: Colors.grey),
+                    )
+                  else
+                    SizedBox(
+                      height: _flags.length > 3 ? 210 : (_flags.length * 80.0),
+                      child: ListView.builder(
+                        itemCount: _flags.length,
+                        itemBuilder: (context, index) {
+                          final flag = _flags[index];
+                          return Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7F2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFFFD7C4),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _latestFlagLabel,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.deepOrange,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Expanded(child: Text(flag.reason)),
+                                    IconButton(
+                                      tooltip: 'Remove flag',
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                      ),
+                                      color: Colors.red[400],
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => _deleteFlag(index),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -958,27 +1223,58 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
               ),
             ),
           ),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 20,
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: _currentIndex == 0 ? null : _goToPrevious,
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: _currentIndex == widget.photos.length - 1
-                      ? null
-                      : _goToNext,
-                  icon: const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.white,
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: false,
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  IgnorePointer(
+                    ignoring: _currentIndex == 0,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _currentIndex == 0 ? 0.35 : 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: _goToPrevious,
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  const Spacer(),
+                  IgnorePointer(
+                    ignoring: _currentIndex == widget.photos.length - 1,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _currentIndex == widget.photos.length - 1
+                          ? 0.35
+                          : 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: _goToNext,
+                          icon: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
             ),
           ),
         ],

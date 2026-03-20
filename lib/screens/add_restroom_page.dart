@@ -286,6 +286,7 @@ class _AddRestroomPageState extends State<AddRestroomPage> {
         openingTime: openingTime,
         closingTime: closingTime,
         isUserAdded: true,
+        createdAt: DateTime.now(),
       );
 
       Navigator.pop(context, newRestroom);

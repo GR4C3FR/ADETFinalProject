@@ -331,6 +331,8 @@ class _EditRestroomPageState extends State<EditRestroomPage> {
       openingTime: openingTime,
       closingTime: closingTime,
       isUserAdded: widget.restroom.isUserAdded,
+      createdAt: widget.restroom.createdAt,
+      updatedAt: DateTime.now(),
     );
 
     Navigator.pop(context, updated);

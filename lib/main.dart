@@ -44,6 +44,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const LatLng _hauDemoCenter = LatLng(15.1325230, 120.5901905);
+  static final DateTime _seedDateMar09 = DateTime(2026, 3, 9);
+  static final DateTime _seedDateMar19 = DateTime(2026, 3, 19);
   static const List<String> _amenityOptions = [
     'Soap',
     'Tissue',
@@ -59,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentTab = 0;
   bool _openNowOnly = false;
   bool _topRatedOnly = false;
+  String _sortOrder = 'latest';
   double _searchRadiusKm = 0.5;
   Set<String> _selectedAmenities = <String>{};
 
@@ -79,8 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, List<RestroomReview>> _reviewsByRestroomKey =
       <String, List<RestroomReview>>{};
   final Set<String> _savedRestroomKeys = <String>{};
-  final Map<String, List<String>> _flagReasonsByRestroomKey =
-      <String, List<String>>{};
+  final Map<String, List<RestroomFlag>> _flagsByRestroomKey =
+      <String, List<RestroomFlag>>{};
 
   String _restroomKey(Restroom restroom) {
     final lat = restroom.latitude?.toStringAsFixed(6) ?? 'na';
@@ -113,13 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   int _flagCountFor(Restroom restroom) {
-    return _flagReasonsByRestroomKey[_restroomKey(restroom)]?.length ?? 0;
+    return _flagsByRestroomKey[_restroomKey(restroom)]?.length ?? 0;
   }
 
   int get _totalFlagCount {
-    return _flagReasonsByRestroomKey.values.fold<int>(
+    return _flagsByRestroomKey.values.fold<int>(
       0,
-      (sum, reasons) => sum + reasons.length,
+      (sum, flags) => sum + flags.length,
     );
   }
 
@@ -132,16 +135,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return List<RestroomReview>.from(_reviewsByRestroomKey[key] ?? const []);
   }
 
-  void _submitUserReview(Restroom restroom, double rating, String comment) {
+  void _setReviewsFor(Restroom restroom, List<RestroomReview> reviews) {
     final key = _restroomKey(restroom);
     setState(() {
-      _reviewsByRestroomKey[key] = [
-        RestroomReview(
-          rating: rating,
-          comment: comment,
-          createdAt: DateTime.now(),
-        ),
-      ];
+      _reviewsByRestroomKey[key] = List<RestroomReview>.from(reviews);
+    });
+  }
+
+  List<RestroomFlag> _flagsFor(Restroom restroom) {
+    final key = _restroomKey(restroom);
+    return List<RestroomFlag>.from(_flagsByRestroomKey[key] ?? const []);
+  }
+
+  void _setFlagsFor(Restroom restroom, List<RestroomFlag> flags) {
+    final key = _restroomKey(restroom);
+    setState(() {
+      _flagsByRestroomKey[key] = List<RestroomFlag>.from(flags);
     });
   }
 
@@ -164,8 +173,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _submitFlag(Restroom restroom, String reason) {
     final key = _restroomKey(restroom);
     setState(() {
-      final existing = _flagReasonsByRestroomKey[key] ?? <String>[];
-      _flagReasonsByRestroomKey[key] = [...existing, reason];
+      final existing = _flagsByRestroomKey[key] ?? <RestroomFlag>[];
+      _flagsByRestroomKey[key] = [
+        ...existing,
+        RestroomFlag(reason: reason, createdAt: DateTime.now()),
+      ];
     });
   }
 
@@ -173,10 +185,84 @@ class _HomeScreenState extends State<HomeScreen> {
     final oldKey = _restroomKey(oldRestroom);
     final newKey = _restroomKey(updatedRestroom);
 
-    final reasons = _flagReasonsByRestroomKey.remove(oldKey);
-    if (reasons != null && reasons.isNotEmpty) {
-      _flagReasonsByRestroomKey[newKey] = reasons;
+    final flags = _flagsByRestroomKey.remove(oldKey);
+    if (flags != null && flags.isNotEmpty) {
+      _flagsByRestroomKey[newKey] = flags;
     }
+  }
+
+  String _timeAgo(DateTime value) {
+    final diff = DateTime.now().difference(value);
+    if (diff.inDays >= 30) {
+      return _formatDate(value);
+    }
+    if (diff.inSeconds < 60) {
+      return '${diff.inSeconds <= 1 ? 1 : diff.inSeconds} sec ago';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} min ago';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours} hr ago';
+    }
+    if (diff.inDays < 7) {
+      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    }
+    if (diff.inDays < 30) {
+      final weeks = (diff.inDays / 7).floor();
+      return '$weeks week${weeks == 1 ? '' : 's'} ago';
+    }
+    final months = (diff.inDays / 30).floor();
+    return '$months mo${months == 1 ? '' : 's'} ago';
+  }
+
+  String _formatDate(DateTime value) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final month = months[value.month - 1];
+    final day = value.day.toString().padLeft(2, '0');
+    return '$month $day, ${value.year}';
+  }
+
+  int _displayReviewCount(Restroom restroom) {
+    final userReviews =
+        _reviewsByRestroomKey[_restroomKey(restroom)] ??
+        const <RestroomReview>[];
+    return restroom.reviewCount + userReviews.length;
+  }
+
+  double _displayRating(Restroom restroom) {
+    final userReviews =
+        _reviewsByRestroomKey[_restroomKey(restroom)] ??
+        const <RestroomReview>[];
+    if (userReviews.isEmpty) return restroom.rating;
+
+    final baseTotal = restroom.rating * restroom.reviewCount;
+    final userTotal = userReviews.fold<double>(
+      0,
+      (sum, review) => sum + review.rating,
+    );
+    final totalCount = restroom.reviewCount + userReviews.length;
+    if (totalCount <= 0) return 0;
+    return double.parse(
+      ((baseTotal + userTotal) / totalCount).toStringAsFixed(1),
+    );
+  }
+
+  String _restroomActivityLabel(Restroom restroom) {
+    return _timeAgo(restroom.createdAt);
   }
 
   void _requestDirectionsTo(Restroom restroom) {
@@ -230,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 9, minute: 0),
         closingTime: const TimeOfDay(hour: 17, minute: 0),
+        createdAt: _seedDateMar09,
       ),
       Restroom(
         imageColor: const Color(0xFF1976D2),
@@ -247,6 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 10, minute: 0),
         closingTime: const TimeOfDay(hour: 0, minute: 0),
+        createdAt: _seedDateMar09,
       ),
       Restroom(
         imageColor: const Color(0xFF42A5F5),
@@ -263,6 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 10, minute: 0),
         closingTime: const TimeOfDay(hour: 21, minute: 0),
+        createdAt: _seedDateMar09,
       ),
       Restroom(
         imageColor: const Color(0xFF1976D2),
@@ -277,10 +366,11 @@ class _HomeScreenState extends State<HomeScreen> {
         amenities: ['Bidet', 'Soap', 'Tissue', 'Lock', 'PWD', 'Accessible'],
         cardColor: const Color(0xFFE3F2FD),
         isOpen: true,
-        openingTime:  const TimeOfDay(hour: 10, minute: 0),
-        closingTime: const TimeOfDay(hour: 21, minute: 0)
+        openingTime: const TimeOfDay(hour: 10, minute: 0),
+        closingTime: const TimeOfDay(hour: 21, minute: 0),
+        createdAt: _seedDateMar19,
       ),
-       Restroom(
+      Restroom(
         imageColor: const Color(0xFF0277BD),
         imagePath: 'assets/images/robinson-angeles.webp',
         name: 'Robinsons Place Angeles',
@@ -295,6 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 10, minute: 0),
         closingTime: const TimeOfDay(hour: 21, minute: 0),
+        createdAt: _seedDateMar19,
       ),
       Restroom(
         imageColor: const Color(0xFF42A5F5),
@@ -311,6 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 10, minute: 0),
         closingTime: const TimeOfDay(hour: 20, minute: 0),
+        createdAt: _seedDateMar19,
       ),
       Restroom(
         imageColor: const Color(0xFF1976D2),
@@ -327,6 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: true,
         openingTime: const TimeOfDay(hour: 8, minute: 0),
         closingTime: const TimeOfDay(hour: 17, minute: 0),
+        createdAt: _seedDateMar19,
       ),
       Restroom(
         imageColor: const Color(0xFF42A5F5),
@@ -343,6 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isOpen: false,
         openingTime: const TimeOfDay(hour: 8, minute: 0),
         closingTime: const TimeOfDay(hour: 22, minute: 0),
+        createdAt: _seedDateMar19,
       ),
     ];
 
@@ -608,6 +702,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openFilterPicker() async {
+    bool tempOpenNowOnly = _openNowOnly;
+    bool tempTopRatedOnly = _topRatedOnly;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      value: tempOpenNowOnly,
+                      title: const Text('Open Now'),
+                      onChanged: (checked) {
+                        setModalState(() {
+                          tempOpenNowOnly = checked ?? false;
+                        });
+                      },
+                    ),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      value: tempTopRatedOnly,
+                      title: const Text('Top Rated'),
+                      onChanged: (checked) {
+                        setModalState(() {
+                          tempTopRatedOnly = checked ?? false;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              tempOpenNowOnly = false;
+                              tempTopRatedOnly = false;
+                            });
+                          },
+                          child: const Text('Clear'),
+                        ),
+                        const Spacer(),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _openNowOnly = tempOpenNowOnly;
+                              _topRatedOnly = tempTopRatedOnly;
+                            });
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openRadiusPicker() async {
     double tempRadius = _searchRadiusKm;
 
@@ -698,34 +872,41 @@ class _HomeScreenState extends State<HomeScreen> {
     final query = _searchController.text.toLowerCase().trim();
     final anchor = _userLocation ?? _hauDemoCenter;
 
-    final filtered = _restrooms.where((r) {
-      final matchesSearch =
-          query.isEmpty ||
-          r.name.toLowerCase().contains(query) ||
-          r.address.toLowerCase().contains(query) ||
-          r.amenities.any((a) => a.toLowerCase().contains(query));
-      final matchesOpen = !_openNowOnly || r.isOpen;
-      final matchesTopRated = !_topRatedOnly || r.rating >= 3.0;
-      final matchesAmenities =
-          _selectedAmenities.isEmpty ||
-          _selectedAmenities.every(r.amenities.contains);
+    final filtered =
+        _restrooms.where((r) {
+          final matchesSearch =
+              query.isEmpty ||
+              r.name.toLowerCase().contains(query) ||
+              r.address.toLowerCase().contains(query) ||
+              r.amenities.any((a) => a.toLowerCase().contains(query));
+          final matchesOpen = !_openNowOnly || r.isOpen;
+          final matchesTopRated = !_topRatedOnly || _displayRating(r) >= 3.0;
+          final matchesAmenities =
+              _selectedAmenities.isEmpty ||
+              _selectedAmenities.every(r.amenities.contains);
 
-      final hasCoords = r.latitude != null && r.longitude != null;
-      final matchesRadius =
-          !hasCoords ||
-          _distance.as(
-                LengthUnit.Kilometer,
-                anchor,
-                LatLng(r.latitude!, r.longitude!),
-              ) <=
-              _searchRadiusKm;
+          final hasCoords = r.latitude != null && r.longitude != null;
+          final matchesRadius =
+              !hasCoords ||
+              _distance.as(
+                    LengthUnit.Kilometer,
+                    anchor,
+                    LatLng(r.latitude!, r.longitude!),
+                  ) <=
+                  _searchRadiusKm;
 
-      return matchesSearch &&
-          matchesOpen &&
-          matchesTopRated &&
-          matchesAmenities &&
-          matchesRadius;
-    }).toList();
+          return matchesSearch &&
+              matchesOpen &&
+              matchesTopRated &&
+              matchesAmenities &&
+              matchesRadius;
+        }).toList()..sort((a, b) {
+          final dateComparison = _sortOrder == 'oldest'
+              ? a.createdAt.compareTo(b.createdAt)
+              : b.createdAt.compareTo(a.createdAt);
+          if (dateComparison != 0) return dateComparison;
+          return b.rating.compareTo(a.rating);
+        });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
@@ -772,63 +953,85 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Search restrooms...',
-                      prefixIcon: Padding(
+                      prefixIcon: const Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Icon(Icons.search, color: Colors.blueGrey),
                       ),
+                      suffixIcon: _searchController.text.trim().isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.blueGrey,
+                              ),
+                            )
+                          : null,
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          label: const Text('Open Now'),
-                          selected: _openNowOnly,
-                          showCheckmark: false,
-                          onSelected: (v) => setState(() => _openNowOnly = v),
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    runAlignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: Text(
+                          (_openNowOnly || _topRatedOnly)
+                              ? 'Filter (${(_openNowOnly ? 1 : 0) + (_topRatedOnly ? 1 : 0)})'
+                              : 'Filter',
                         ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Top Rated'),
-                          selected: _topRatedOnly,
-                          showCheckmark: false,
-                          onSelected: (v) => setState(() => _topRatedOnly = v),
+                        selected: _openNowOnly || _topRatedOnly,
+                        showCheckmark: false,
+                        onSelected: (_) => _openFilterPicker(),
+                      ),
+                      FilterChip(
+                        label: Text(
+                          _sortOrder == 'latest'
+                              ? 'Sort: Latest'
+                              : 'Sort: Oldest',
                         ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: Text(
-                            'Radius (${_searchRadiusKm.toStringAsFixed(1)} km)',
-                          ),
-                          selected: true,
-                          showCheckmark: false,
-                          onSelected: (_) => _openRadiusPicker(),
+                        selected: true,
+                        showCheckmark: false,
+                        onSelected: (_) {
+                          setState(() {
+                            _sortOrder = _sortOrder == 'latest'
+                                ? 'oldest'
+                                : 'latest';
+                          });
+                        },
+                      ),
+                      FilterChip(
+                        label: Text(
+                          'Radius (${_searchRadiusKm.toStringAsFixed(1)} km)',
                         ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: Text(
-                            _selectedAmenities.isEmpty
-                                ? 'Amenities'
-                                : 'Amenities (${_selectedAmenities.length})',
-                          ),
-                          selected: _selectedAmenities.isNotEmpty,
-                          showCheckmark: false,
-                          onSelected: (_) => _openAmenityPicker(),
+                        selected: true,
+                        showCheckmark: false,
+                        onSelected: (_) => _openRadiusPicker(),
+                      ),
+                      FilterChip(
+                        label: Text(
+                          _selectedAmenities.isEmpty
+                              ? 'Amenities'
+                              : 'Amenities (${_selectedAmenities.length})',
                         ),
-                        const SizedBox(width: 12),
-                      ],
-                    ),
+                        selected: _selectedAmenities.isNotEmpty,
+                        showCheckmark: false,
+                        onSelected: (_) => _openAmenityPicker(),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -862,8 +1065,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                           return RestroomCard(
                             restroom: restroom,
+                            displayRating: _displayRating(restroom),
+                            displayReviewCount: _displayReviewCount(restroom),
                             distanceLabel: distanceLabel,
                             flagCount: _flagCountFor(restroom),
+                            restroomActivityLabel: _restroomActivityLabel(
+                              restroom,
+                            ),
                             isSaved: _isSaved(restroom),
                             onToggleSaved: () => _toggleSaved(restroom),
                             onDirections: () => _requestDirectionsTo(restroom),
@@ -881,14 +1089,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     onToggleSaved: () => _toggleSaved(restroom),
                                     flagCount: _flagCountFor(restroom),
                                     initialReviews: _reviewsFor(restroom),
-                                    onSubmitReview: (rating, comment) =>
-                                        _submitUserReview(
-                                          restroom,
-                                          rating,
-                                          comment,
-                                        ),
+                                    initialFlags: _flagsFor(restroom),
+                                    onReviewsChanged: (reviews) =>
+                                        _setReviewsFor(restroom, reviews),
+                                    onFlagsChanged: (flags) =>
+                                        _setFlagsFor(restroom, flags),
                                     onSubmitFlag: (reason) =>
                                         _submitFlag(restroom, reason),
+                                    restroomActivityLabel:
+                                        _restroomActivityLabel(restroom),
                                     onRestroomChanged: (updatedRestroom) {
                                       setState(() {
                                         if (restroomIndex != -1) {
@@ -922,7 +1131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _savedRestroomKeys.remove(
                                     _restroomKey(restroom),
                                   );
-                                  _flagReasonsByRestroomKey.remove(
+                                  _flagsByRestroomKey.remove(
                                     _restroomKey(restroom),
                                   );
                                   _reviewsByRestroomKey.remove(
@@ -953,6 +1162,7 @@ class _HomeScreenState extends State<HomeScreen> {
             searchQuery: _searchController.text,
             openNowOnly: _openNowOnly,
             topRatedOnly: _topRatedOnly,
+            sortOrder: _sortOrder,
             searchRadiusKm: _searchRadiusKm,
             selectedAmenities: _selectedAmenities,
             onSearchQueryChanged: _setSharedSearchQuery,
@@ -963,6 +1173,10 @@ class _HomeScreenState extends State<HomeScreen> {
             onTopRatedOnlyChanged: (value) {
               if (_topRatedOnly == value) return;
               setState(() => _topRatedOnly = value);
+            },
+            onSortOrderChanged: (value) {
+              if (_sortOrder == value) return;
+              setState(() => _sortOrder = value);
             },
             onSearchRadiusKmChanged: (value) {
               if (_searchRadiusKm == value) return;
@@ -997,7 +1211,7 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 _restrooms.removeWhere((r) => identical(r, restroom));
                 _savedRestroomKeys.remove(_restroomKey(restroom));
-                _flagReasonsByRestroomKey.remove(_restroomKey(restroom));
+                _flagsByRestroomKey.remove(_restroomKey(restroom));
                 _reviewsByRestroomKey.remove(_restroomKey(restroom));
               });
             },
@@ -1006,27 +1220,27 @@ class _HomeScreenState extends State<HomeScreen> {
             restroomFlagCount: _flagCountFor,
             onSubmitRestroomFlag: _submitFlag,
             restroomReviews: _reviewsFor,
-            onSubmitRestroomReview: _submitUserReview,
+            restroomFlags: _flagsFor,
+            onRestroomReviewsChanged: _setReviewsFor,
+            onRestroomFlagsChanged: _setFlagsFor,
+            restroomActivityLabel: _restroomActivityLabel,
+            restroomDisplayRating: _displayRating,
+            restroomDisplayReviewCount: _displayReviewCount,
           ),
           ProfilePage(
             addedCount: _addedRestroomCount,
             reviewsCount: _userReviewCount,
             savedCount: _savedRestroomKeys.length,
             flagCount: _totalFlagCount,
-            addedRestrooms: _restrooms
-                .where((r) => r.isUserAdded)
-                .toList(),
+            addedRestrooms: _restrooms.where((r) => r.isUserAdded).toList(),
             reviewedRestrooms: _restrooms
-                .where((r) => _reviewsByRestroomKey
-                    .containsKey(_restroomKey(r)))
+                .where(
+                  (r) => _reviewsByRestroomKey.containsKey(_restroomKey(r)),
+                )
                 .toList(),
-            savedRestrooms: _restrooms
-                .where((r) => _isSaved(r))
-                .toList(),
+            savedRestrooms: _restrooms.where((r) => _isSaved(r)).toList(),
             flaggedRestrooms: _restrooms
-                .where((r) =>
-                    _flagReasonsByRestroomKey
-                        .containsKey(_restroomKey(r)))
+                .where((r) => _flagsByRestroomKey.containsKey(_restroomKey(r)))
                 .toList(),
             onRestroomTap: (restroom) async {
               final result = await Navigator.push<Object?>(
@@ -1037,11 +1251,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     isSaved: _isSaved(restroom),
                     onToggleSaved: () => _toggleSaved(restroom),
                     flagCount: _flagCountFor(restroom),
-                    onSubmitFlag: (reason) =>
-                        _submitFlag(restroom, reason),
+                    onSubmitFlag: (reason) => _submitFlag(restroom, reason),
                     initialReviews: _reviewsFor(restroom),
-                    onSubmitReview: (rating, comment) =>
-                        _submitUserReview(restroom, rating, comment),
+                    initialFlags: _flagsFor(restroom),
+                    onReviewsChanged: (reviews) =>
+                        _setReviewsFor(restroom, reviews),
+                    onFlagsChanged: (flags) => _setFlagsFor(restroom, flags),
+                    restroomActivityLabel: _restroomActivityLabel(restroom),
                     onRestroomChanged: (updatedRestroom) {
                       _migrateReviewKey(restroom, updatedRestroom);
                       _migrateSavedKey(restroom, updatedRestroom);
@@ -1111,8 +1327,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class RestroomCard extends StatelessWidget {
   final Restroom restroom;
+  final double displayRating;
+  final int displayReviewCount;
   final String? distanceLabel;
   final int flagCount;
+  final String restroomActivityLabel;
   final VoidCallback? onTap;
   final VoidCallback? onDirections;
   final bool isSaved;
@@ -1121,8 +1340,11 @@ class RestroomCard extends StatelessWidget {
   const RestroomCard({
     super.key,
     required this.restroom,
+    required this.displayRating,
+    required this.displayReviewCount,
     this.distanceLabel,
     this.flagCount = 0,
+    required this.restroomActivityLabel,
     this.onTap,
     this.onDirections,
     this.isSaved = false,
@@ -1246,7 +1468,7 @@ class RestroomCard extends StatelessWidget {
                       const Icon(Icons.star, color: Colors.amber, size: 15),
                       const SizedBox(width: 4),
                       Text(
-                        '${restroom.rating}  (${restroom.reviewCount})',
+                        '${displayRating.toStringAsFixed(1)}  ($displayReviewCount)',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -1374,6 +1596,21 @@ class RestroomCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.blueGrey,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          restroomActivityLabel,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.blueGrey,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),

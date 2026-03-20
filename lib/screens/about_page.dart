@@ -12,29 +12,6 @@ class AboutPage extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: double.infinity,
-              color: appBlue,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.wc,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    'PottyPal',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
               color: const Color(0xFFF5F5F5),
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
@@ -183,25 +160,17 @@ class AboutPage extends StatelessWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      _CreditName(
-                                        name: 'James Jethro Dizon',
-                                      ),
+                                      _CreditName(name: 'James Jethro Dizon'),
                                       const SizedBox(height: 12),
                                       _CreditName(
                                         name: 'Charles Daniel Garcia',
                                       ),
                                       const SizedBox(height: 12),
-                                      _CreditName(
-                                        name: 'Ericka Mae Gavino',
-                                      ),
+                                      _CreditName(name: 'Ericka Mae Gavino'),
                                       const SizedBox(height: 12),
-                                      _CreditName(
-                                        name: 'Carla Joves',
-                                      ),
+                                      _CreditName(name: 'Carla Joves'),
                                       const SizedBox(height: 12),
-                                      _CreditName(
-                                        name: 'Alexander Manabat',
-                                      ),
+                                      _CreditName(name: 'Alexander Manabat'),
                                     ],
                                   ),
                                 ),
@@ -234,12 +203,8 @@ class _BenefitItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.only(top: 2, right: 12),
-          child: Icon(
-            Icons.check_circle,
-            color: Color(0xFF4CAF50),
-            size: 20,
-          ),
+          padding: EdgeInsets.only(top: 6, right: 12),
+          child: Icon(Icons.circle, color: Color(0xFF1565C0), size: 8),
         ),
         Expanded(
           child: Text(

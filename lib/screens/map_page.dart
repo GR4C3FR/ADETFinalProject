@@ -24,18 +24,26 @@ class MapPage extends StatefulWidget {
   final int Function(Restroom restroom)? restroomFlagCount;
   final void Function(Restroom restroom, String reason)? onSubmitRestroomFlag;
   final List<RestroomReview> Function(Restroom restroom)? restroomReviews;
-  final void Function(Restroom restroom, double rating, String comment)?
-  onSubmitRestroomReview;
+  final List<RestroomFlag> Function(Restroom restroom)? restroomFlags;
+  final void Function(Restroom restroom, List<RestroomReview> reviews)?
+  onRestroomReviewsChanged;
+  final void Function(Restroom restroom, List<RestroomFlag> flags)?
+  onRestroomFlagsChanged;
+  final String Function(Restroom restroom)? restroomActivityLabel;
+  final double Function(Restroom restroom)? restroomDisplayRating;
+  final int Function(Restroom restroom)? restroomDisplayReviewCount;
   final Restroom? directionsTarget;
   final int directionsRequestId;
   final String searchQuery;
   final bool openNowOnly;
   final bool topRatedOnly;
+  final String sortOrder;
   final double searchRadiusKm;
   final Set<String> selectedAmenities;
   final ValueChanged<String>? onSearchQueryChanged;
   final ValueChanged<bool>? onOpenNowOnlyChanged;
   final ValueChanged<bool>? onTopRatedOnlyChanged;
+  final ValueChanged<String>? onSortOrderChanged;
   final ValueChanged<double>? onSearchRadiusKmChanged;
   final ValueChanged<Set<String>>? onSelectedAmenitiesChanged;
 
@@ -50,17 +58,24 @@ class MapPage extends StatefulWidget {
     this.restroomFlagCount,
     this.onSubmitRestroomFlag,
     this.restroomReviews,
-    this.onSubmitRestroomReview,
+    this.restroomFlags,
+    this.onRestroomReviewsChanged,
+    this.onRestroomFlagsChanged,
+    this.restroomActivityLabel,
+    this.restroomDisplayRating,
+    this.restroomDisplayReviewCount,
     this.directionsTarget,
     this.directionsRequestId = 0,
     this.searchQuery = '',
     this.openNowOnly = false,
     this.topRatedOnly = false,
+    this.sortOrder = 'latest',
     this.searchRadiusKm = 0.5,
     this.selectedAmenities = const <String>{},
     this.onSearchQueryChanged,
     this.onOpenNowOnlyChanged,
     this.onTopRatedOnlyChanged,
+    this.onSortOrderChanged,
     this.onSearchRadiusKmChanged,
     this.onSelectedAmenitiesChanged,
   });
@@ -98,6 +113,7 @@ class _MapPageState extends State<MapPage>
   bool _isLoading = false;
   bool _openNowOnly = false;
   bool _topRatedOnly = false;
+  String _sortOrder = 'latest';
   double _searchRadiusKm = 0.5;
   bool _showReturnToUserButton = false;
   bool _isRouting = false;
@@ -134,6 +150,7 @@ class _MapPageState extends State<MapPage>
     super.initState();
     _openNowOnly = widget.openNowOnly;
     _topRatedOnly = widget.topRatedOnly;
+    _sortOrder = widget.sortOrder;
     _searchRadiusKm = widget.searchRadiusKm;
     _selectedAmenities = Set<String>.from(widget.selectedAmenities);
     _searchController.text = widget.searchQuery;
@@ -181,11 +198,13 @@ class _MapPageState extends State<MapPage>
 
     if (_openNowOnly != widget.openNowOnly ||
         _topRatedOnly != widget.topRatedOnly ||
+        _sortOrder != widget.sortOrder ||
         _searchRadiusKm != widget.searchRadiusKm ||
         !setEquals(_selectedAmenities, widget.selectedAmenities)) {
       setState(() {
         _openNowOnly = widget.openNowOnly;
         _topRatedOnly = widget.topRatedOnly;
+        _sortOrder = widget.sortOrder;
         _searchRadiusKm = widget.searchRadiusKm;
         _selectedAmenities = Set<String>.from(widget.selectedAmenities);
       });
@@ -275,32 +294,50 @@ class _MapPageState extends State<MapPage>
 
   List<String> get _availableAmenities => _amenityOptions;
 
+  double _displayRatingFor(Restroom restroom) {
+    return widget.restroomDisplayRating?.call(restroom) ?? restroom.rating;
+  }
+
+  int _displayReviewCountFor(Restroom restroom) {
+    return widget.restroomDisplayReviewCount?.call(restroom) ??
+        restroom.reviewCount;
+  }
+
   List<_MapRestroomPoint> get _filteredRestrooms {
     final query = _searchController.text.toLowerCase().trim();
     final anchor = _userLocation ?? _activeMapCenter ?? _hauDemoCenter;
 
-    final results = _allRestrooms.where((restroom) {
-      final point = _pinPositionFor(restroom, _allRestrooms.indexOf(restroom));
-      final distanceKm = _distance.as(LengthUnit.Kilometer, anchor, point);
+    final results =
+        _allRestrooms.where((restroom) {
+          final point = _pinPositionFor(
+            restroom,
+            _allRestrooms.indexOf(restroom),
+          );
+          final distanceKm = _distance.as(LengthUnit.Kilometer, anchor, point);
 
-      final matchesSearch =
-          query.isEmpty ||
-          restroom.name.toLowerCase().contains(query) ||
-          restroom.fullAddress.toLowerCase().contains(query) ||
-          restroom.amenities.any((a) => a.toLowerCase().contains(query));
-      final matchesOpen = !_openNowOnly || restroom.isOpen;
-      final matchesAmenities =
-          _selectedAmenities.isEmpty ||
-          _selectedAmenities.every(restroom.amenities.contains);
-      final matchesTopRated = !_topRatedOnly || restroom.rating >= 3.0;
-      final matchesRadius = distanceKm <= _searchRadiusKm;
+          final matchesSearch =
+              query.isEmpty ||
+              restroom.name.toLowerCase().contains(query) ||
+              restroom.fullAddress.toLowerCase().contains(query) ||
+              restroom.amenities.any((a) => a.toLowerCase().contains(query));
+          final matchesOpen = !_openNowOnly || restroom.isOpen;
+          final matchesAmenities =
+              _selectedAmenities.isEmpty ||
+              _selectedAmenities.every(restroom.amenities.contains);
+          final matchesTopRated =
+              !_topRatedOnly || _displayRatingFor(restroom.restroom) >= 3.0;
+          final matchesRadius = distanceKm <= _searchRadiusKm;
 
-      return matchesSearch &&
-          matchesOpen &&
-          matchesAmenities &&
-          matchesTopRated &&
-          matchesRadius;
-    }).toList()..sort((a, b) => b.rating.compareTo(a.rating));
+          return matchesSearch &&
+              matchesOpen &&
+              matchesAmenities &&
+              matchesTopRated &&
+              matchesRadius;
+        }).toList()..sort(
+          (a, b) => _displayRatingFor(
+            b.restroom,
+          ).compareTo(_displayRatingFor(a.restroom)),
+        );
 
     return results;
   }
@@ -719,6 +756,90 @@ class _MapPageState extends State<MapPage>
     );
   }
 
+  Future<void> _openFilterPicker() async {
+    bool tempOpenNowOnly = _openNowOnly;
+    bool tempTopRatedOnly = _topRatedOnly;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      value: tempOpenNowOnly,
+                      title: const Text('Open Now'),
+                      onChanged: (checked) {
+                        setModalState(() {
+                          tempOpenNowOnly = checked ?? false;
+                        });
+                      },
+                    ),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      value: tempTopRatedOnly,
+                      title: const Text('Top Rated'),
+                      onChanged: (checked) {
+                        setModalState(() {
+                          tempTopRatedOnly = checked ?? false;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              tempOpenNowOnly = false;
+                              tempTopRatedOnly = false;
+                            });
+                          },
+                          child: const Text('Clear'),
+                        ),
+                        const Spacer(),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _openNowOnly = tempOpenNowOnly;
+                              _topRatedOnly = tempTopRatedOnly;
+                            });
+                            widget.onOpenNowOnlyChanged?.call(tempOpenNowOnly);
+                            widget.onTopRatedOnlyChanged?.call(
+                              tempTopRatedOnly,
+                            );
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openRadiusPicker() async {
     double tempRadius = _searchRadiusKm;
 
@@ -804,6 +925,8 @@ class _MapPageState extends State<MapPage>
             : _defaultCenter);
 
     final filtered = _filteredRestrooms;
+    final canExpandResults = filtered.isNotEmpty;
+    final isResultsExpandedEffective = _isResultsExpanded && canExpandResults;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -838,42 +961,62 @@ class _MapPageState extends State<MapPage>
                   ),
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Search restrooms...',
-                      prefixIcon: Padding(
+                      prefixIcon: const Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Icon(Icons.search, color: Colors.blueGrey),
                       ),
+                      suffixIcon: _searchController.text.trim().isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: _searchController.clear,
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.blueGrey,
+                              ),
+                            )
+                          : null,
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                Align(
+                  alignment: Alignment.center,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    runAlignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       FilterChip(
-                        label: const Text('Open Now'),
-                        selected: _openNowOnly,
+                        label: Text(
+                          (_openNowOnly || _topRatedOnly)
+                              ? 'Filter (${(_openNowOnly ? 1 : 0) + (_topRatedOnly ? 1 : 0)})'
+                              : 'Filter',
+                        ),
+                        selected: _openNowOnly || _topRatedOnly,
                         showCheckmark: false,
-                        onSelected: (v) {
-                          setState(() => _openNowOnly = v);
-                          widget.onOpenNowOnlyChanged?.call(v);
-                        },
+                        onSelected: (_) => _openFilterPicker(),
                       ),
-                      const SizedBox(width: 8),
                       FilterChip(
-                        label: const Text('Top Rated'),
-                        selected: _topRatedOnly,
+                        label: Text(
+                          _sortOrder == 'latest'
+                              ? 'Sort: Latest'
+                              : 'Sort: Oldest',
+                        ),
+                        selected: true,
                         showCheckmark: false,
-                        onSelected: (v) {
-                          setState(() => _topRatedOnly = v);
-                          widget.onTopRatedOnlyChanged?.call(v);
+                        onSelected: (_) {
+                          final next = _sortOrder == 'latest'
+                              ? 'oldest'
+                              : 'latest';
+                          setState(() => _sortOrder = next);
+                          widget.onSortOrderChanged?.call(next);
                         },
                       ),
-                      const SizedBox(width: 8),
                       FilterChip(
                         label: Text(
                           'Radius (${_searchRadiusKm.toStringAsFixed(1)} km)',
@@ -882,7 +1025,6 @@ class _MapPageState extends State<MapPage>
                         showCheckmark: false,
                         onSelected: (_) => _openRadiusPicker(),
                       ),
-                      const SizedBox(width: 8),
                       FilterChip(
                         label: Text(
                           _selectedAmenities.isEmpty
@@ -1033,300 +1175,358 @@ class _MapPageState extends State<MapPage>
             left: 10,
             right: 10,
             bottom: 10,
-            child: Container(
-              key: _resultsPanelKey,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Results (${filtered.length})',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: _isResultsExpanded
-                            ? 'Collapse results'
-                            : 'Expand results',
-                        onPressed: () {
-                          setState(() {
-                            _isResultsExpanded = !_isResultsExpanded;
-                          });
-                        },
-                        icon: Icon(
-                          _isResultsExpanded
-                              ? Icons.expand_more_rounded
-                              : Icons.expand_less_rounded,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Previous',
-                        onPressed: _isResultsExpanded && _canScrollPrevious
-                            ? () => _scrollResultsBy(forward: false)
-                            : null,
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      ),
-                      IconButton(
-                        tooltip: 'Next',
-                        onPressed: _isResultsExpanded && _canScrollNext
-                            ? () => _scrollResultsBy(forward: true)
-                            : null,
-                        icon: const Icon(Icons.arrow_forward_ios_rounded),
-                      ),
-                    ],
+            child: NotificationListener<SizeChangedLayoutNotification>(
+              onNotification: (_) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  _updateResultsPanelHeight();
+                });
+                return false;
+              },
+              child: SizeChangedLayoutNotifier(
+                child: Container(
+                  key: _resultsPanelKey,
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOut,
-                    child: _isResultsExpanded
-                        ? (filtered.isEmpty
-                              ? const Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    'No results match your search/filters.',
-                                  ),
-                                )
-                              : SizedBox(
-                                  height: 114,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onHorizontalDragUpdate: (_) {},
-                                    child: ListView.separated(
-                                      controller: _resultsScrollController,
-                                      scrollDirection: Axis.horizontal,
-                                      physics: const BouncingScrollPhysics(),
-                                      itemCount: filtered.length,
-                                      separatorBuilder: (_, _) =>
-                                          const SizedBox(width: 8),
-                                      itemBuilder: (context, index) {
-                                        final item = filtered[index];
-                                        return InkWell(
-                                          onTap: () async {
-                                            final result = await Navigator.push<Object?>(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => RestroomDetailPage(
-                                                  restroom: item.restroom,
-                                                  onGetDirections: () {
-                                                    Navigator.pop(context);
-                                                    _showDirectionsTo(
-                                                      item.restroom,
-                                                    );
-                                                  },
-                                                  isSaved:
-                                                      widget.isRestroomSaved
-                                                          ?.call(
-                                                            item.restroom,
-                                                          ) ??
-                                                      false,
-                                                  flagCount:
-                                                      widget.restroomFlagCount
-                                                          ?.call(
-                                                            item.restroom,
-                                                          ) ??
-                                                      0,
-                                                  onToggleSaved:
-                                                      widget.onToggleRestroomSaved ==
-                                                          null
-                                                      ? null
-                                                      : () =>
-                                                            widget
-                                                                .onToggleRestroomSaved!(
-                                                              item.restroom,
-                                                            ),
-                                                  onSubmitFlag:
-                                                      widget.onSubmitRestroomFlag ==
-                                                          null
-                                                      ? null
-                                                      : (reason) =>
-                                                            widget
-                                                                .onSubmitRestroomFlag!(
-                                                              item.restroom,
-                                                              reason,
-                                                            ),
-                                                  initialReviews:
-                                                      widget.restroomReviews
-                                                          ?.call(
-                                                            item.restroom,
-                                                          ) ??
-                                                      const [],
-                                                  onSubmitReview:
-                                                      widget.onSubmitRestroomReview ==
-                                                          null
-                                                      ? null
-                                                      : (rating, comment) =>
-                                                            widget
-                                                                .onSubmitRestroomReview!(
-                                                              item.restroom,
-                                                              rating,
-                                                              comment,
-                                                            ),
-                                                  onRestroomChanged:
-                                                      (updatedRestroom) {
-                                                        widget
-                                                            .onRestroomUpdated(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Results (${filtered.length})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: _isResultsExpanded
+                                ? 'Collapse results'
+                                : 'Expand results',
+                            onPressed: canExpandResults
+                                ? () {
+                                    setState(() {
+                                      _isResultsExpanded = !_isResultsExpanded;
+                                    });
+                                  }
+                                : null,
+                            icon: Icon(
+                              _isResultsExpanded
+                                  ? Icons.expand_more_rounded
+                                  : Icons.expand_less_rounded,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Previous',
+                            onPressed:
+                                isResultsExpandedEffective && _canScrollPrevious
+                                ? () => _scrollResultsBy(forward: false)
+                                : null,
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                          ),
+                          IconButton(
+                            tooltip: 'Next',
+                            onPressed:
+                                isResultsExpandedEffective && _canScrollNext
+                                ? () => _scrollResultsBy(forward: true)
+                                : null,
+                            icon: const Icon(Icons.arrow_forward_ios_rounded),
+                          ),
+                        ],
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeInOut,
+                        child: isResultsExpandedEffective
+                            ? (filtered.isEmpty
+                                  ? const Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'No results match your search/filters.',
+                                      ),
+                                    )
+                                  : SizedBox(
+                                      height: 114,
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onHorizontalDragUpdate: (_) {},
+                                        child: ListView.separated(
+                                          controller: _resultsScrollController,
+                                          scrollDirection: Axis.horizontal,
+                                          physics:
+                                              const BouncingScrollPhysics(),
+                                          itemCount: filtered.length,
+                                          separatorBuilder: (_, _) =>
+                                              const SizedBox(width: 8),
+                                          itemBuilder: (context, index) {
+                                            final item = filtered[index];
+                                            final displayRating =
+                                                _displayRatingFor(
+                                                  item.restroom,
+                                                );
+                                            final displayReviewCount =
+                                                _displayReviewCountFor(
+                                                  item.restroom,
+                                                );
+                                            return InkWell(
+                                              onTap: () async {
+                                                final result = await Navigator.push<Object?>(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => RestroomDetailPage(
+                                                      restroom: item.restroom,
+                                                      onGetDirections: () {
+                                                        Navigator.pop(context);
+                                                        _showDirectionsTo(
+                                                          item.restroom,
+                                                        );
+                                                      },
+                                                      isSaved:
+                                                          widget.isRestroomSaved
+                                                              ?.call(
+                                                                item.restroom,
+                                                              ) ??
+                                                          false,
+                                                      flagCount:
+                                                          widget
+                                                              .restroomFlagCount
+                                                              ?.call(
+                                                                item.restroom,
+                                                              ) ??
+                                                          0,
+                                                      onToggleSaved:
+                                                          widget.onToggleRestroomSaved ==
+                                                              null
+                                                          ? null
+                                                          : () =>
+                                                                widget
+                                                                    .onToggleRestroomSaved!(
+                                                                  item.restroom,
+                                                                ),
+                                                      onSubmitFlag:
+                                                          widget.onSubmitRestroomFlag ==
+                                                              null
+                                                          ? null
+                                                          : (reason) =>
+                                                                widget
+                                                                    .onSubmitRestroomFlag!(
+                                                                  item.restroom,
+                                                                  reason,
+                                                                ),
+                                                      initialReviews:
+                                                          widget.restroomReviews
+                                                              ?.call(
+                                                                item.restroom,
+                                                              ) ??
+                                                          const [],
+                                                      initialFlags:
+                                                          widget.restroomFlags
+                                                              ?.call(
+                                                                item.restroom,
+                                                              ) ??
+                                                          const [],
+                                                      onReviewsChanged:
+                                                          widget.onRestroomReviewsChanged ==
+                                                              null
+                                                          ? null
+                                                          : (reviews) =>
+                                                                widget
+                                                                    .onRestroomReviewsChanged!(
+                                                                  item.restroom,
+                                                                  reviews,
+                                                                ),
+                                                      onFlagsChanged:
+                                                          widget.onRestroomFlagsChanged ==
+                                                              null
+                                                          ? null
+                                                          : (flags) =>
+                                                                widget
+                                                                    .onRestroomFlagsChanged!(
+                                                                  item.restroom,
+                                                                  flags,
+                                                                ),
+                                                      restroomActivityLabel:
+                                                          widget
+                                                              .restroomActivityLabel
+                                                              ?.call(
+                                                                item.restroom,
+                                                              ) ??
+                                                          'Added now',
+                                                      onRestroomChanged:
+                                                          (updatedRestroom) {
+                                                            widget.onRestroomUpdated(
                                                               item.restroom,
                                                               updatedRestroom,
                                                             );
-                                                      },
-                                                ),
-                                              ),
-                                            );
-
-                                            if (!mounted) return;
-                                            if (result == 'deleted') {
-                                              widget.onRestroomDeleted(
-                                                item.restroom,
-                                              );
-                                            } else if (result is Restroom) {
-                                              widget.onRestroomUpdated(
-                                                item.restroom,
-                                                result,
-                                              );
-                                            }
-                                          },
-                                          onLongPress: () {
-                                            setState(() {
-                                              _activeMapCenter =
-                                                  _pinPositionFor(item, index);
-                                            });
-                                          },
-                                          child: Container(
-                                            width: 220,
-                                            padding: const EdgeInsets.fromLTRB(
-                                              10,
-                                              8,
-                                              10,
-                                              8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE3F2FD),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  item.name,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Icons.star,
-                                                      color: Colors.amber,
-                                                      size: 14,
+                                                          },
                                                     ),
-                                                    const SizedBox(width: 4),
+                                                  ),
+                                                );
+
+                                                if (!mounted) return;
+                                                if (result == 'deleted') {
+                                                  widget.onRestroomDeleted(
+                                                    item.restroom,
+                                                  );
+                                                } else if (result is Restroom) {
+                                                  widget.onRestroomUpdated(
+                                                    item.restroom,
+                                                    result,
+                                                  );
+                                                }
+                                              },
+                                              onLongPress: () {
+                                                setState(() {
+                                                  _activeMapCenter =
+                                                      _pinPositionFor(
+                                                        item,
+                                                        index,
+                                                      );
+                                                });
+                                              },
+                                              child: Container(
+                                                width: 220,
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                      10,
+                                                      8,
+                                                      10,
+                                                      8,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFFE3F2FD,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
                                                     Text(
-                                                      '${item.rating.toStringAsFixed(1)}  (${item.reviewCount})',
+                                                      item.name,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                       style: const TextStyle(
-                                                        fontSize: 11,
                                                         fontWeight:
-                                                            FontWeight.w600,
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.star,
+                                                          color: Colors.amber,
+                                                          size: 14,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          '${displayRating.toStringAsFixed(1)}  ($displayReviewCount)',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 11,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      item
+                                                          .restroom
+                                                          .availabilityStatusText,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: item.isOpen
+                                                            ? Colors.green[700]
+                                                            : Colors.red[700],
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${item.restroom.operatingHoursLabel} (PHT)',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        color: Colors.blueGrey,
+                                                        fontSize: 9,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    SingleChildScrollView(
+                                                      scrollDirection:
+                                                          Axis.horizontal,
+                                                      child: Row(
+                                                        children: item.amenities
+                                                            .take(3)
+                                                            .map(
+                                                              (a) => Container(
+                                                                margin:
+                                                                    const EdgeInsets.only(
+                                                                      right: 4,
+                                                                    ),
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                decoration: BoxDecoration(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        10,
+                                                                      ),
+                                                                  border: Border.all(
+                                                                    color: const Color(
+                                                                      0xFF1565C0,
+                                                                    ),
+                                                                    width: 0.7,
+                                                                  ),
+                                                                ),
+                                                                child: Text(
+                                                                  a,
+                                                                  style:
+                                                                      const TextStyle(
+                                                                        fontSize:
+                                                                            10,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            )
+                                                            .toList(),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  item
-                                                      .restroom
-                                                      .availabilityStatusText,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: item.isOpen
-                                                        ? Colors.green[700]
-                                                        : Colors.red[700],
-                                                    fontSize: 10,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  '${item.restroom.operatingHoursLabel} (PHT)',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Colors.blueGrey,
-                                                    fontSize: 9,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                SingleChildScrollView(
-                                                  scrollDirection:
-                                                      Axis.horizontal,
-                                                  child: Row(
-                                                    children: item.amenities
-                                                        .take(3)
-                                                        .map(
-                                                          (a) => Container(
-                                                            margin:
-                                                                const EdgeInsets.only(
-                                                                  right: 4,
-                                                                ),
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                                  horizontal: 6,
-                                                                  vertical: 2,
-                                                                ),
-                                                            decoration: BoxDecoration(
-                                                              color:
-                                                                  Colors.white,
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    10,
-                                                                  ),
-                                                              border: Border.all(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF1565C0,
-                                                                    ),
-                                                                width: 0.7,
-                                                              ),
-                                                            ),
-                                                            child: Text(
-                                                              a,
-                                                              style:
-                                                                  const TextStyle(
-                                                                    fontSize:
-                                                                        10,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        )
-                                                        .toList(),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ))
-                        : const SizedBox.shrink(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ))
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1477,14 +1677,27 @@ class _MapPageState extends State<MapPage>
                         initialReviews:
                             widget.restroomReviews?.call(point.restroom) ??
                             const [],
-                        onSubmitReview: widget.onSubmitRestroomReview == null
+                        initialFlags:
+                            widget.restroomFlags?.call(point.restroom) ??
+                            const [],
+                        onReviewsChanged:
+                            widget.onRestroomReviewsChanged == null
                             ? null
-                            : (rating, comment) =>
-                                  widget.onSubmitRestroomReview!(
-                                    point.restroom,
-                                    rating,
-                                    comment,
-                                  ),
+                            : (reviews) => widget.onRestroomReviewsChanged!(
+                                point.restroom,
+                                reviews,
+                              ),
+                        onFlagsChanged: widget.onRestroomFlagsChanged == null
+                            ? null
+                            : (flags) => widget.onRestroomFlagsChanged!(
+                                point.restroom,
+                                flags,
+                              ),
+                        restroomActivityLabel:
+                            widget.restroomActivityLabel?.call(
+                              point.restroom,
+                            ) ??
+                            'Added now',
                         onRestroomChanged: (updatedRestroom) {
                           widget.onRestroomUpdated(
                             point.restroom,
